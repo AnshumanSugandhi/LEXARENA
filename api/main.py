@@ -6,6 +6,7 @@ from core.semantic_engine import SemanticEngine
 from fastapi.middleware.cors import CORSMiddleware
 
 
+
 app = FastAPI(title="LexArena API")
 
 sections = load_sections("data/processed/bns_sections.json")
@@ -43,13 +44,16 @@ def semantic(q: str):
         for r in results
     ]
 
+# In api/main.py
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
-        "https://lexarena-eight.vercel.app/",
-        "https://web-production-757f2.up.railway.app/"
+        "http://localhost:3000",                 # Local development
+        "https://lexarena-eight.vercel.app",     # <--- YOUR FRONTEND
+        "https://lexarena-eight.vercel.app/"     # (Add this too, just to be safe)
     ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
