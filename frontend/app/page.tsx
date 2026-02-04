@@ -25,7 +25,7 @@ export default function Home() {
   setSelectedExplanation(null);
 
   const res = await fetch(
-    `http://localhost:8000/semantic-search?q=${encodeURIComponent(query)}`
+    `https://web-production-757f2.up.railway.app/semantic-search?q=${encodeURIComponent(query)}`
   );
 
   const data: SectionResult[] = await res.json();
@@ -39,7 +39,7 @@ export default function Home() {
   setSelectedExplanation("Loading explanation...");
 
   const res = await fetch(
-    `http://localhost:8000/explain/${sectionId}`
+    `https://web-production-757f2.up.railway.app/explain/${sectionId}`
   );
 
   const data: { explanation: string } = await res.json();
