@@ -47,11 +47,11 @@ export default function Home() {
 }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-10">
+    <main className="min-h-screen bg-black-100 p-10">
       <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-8">
         {/* Header */}
         <h1 className="text-4xl font-bold mb-2">LexArena ⚖️</h1>
-        <p className="text-gray-600 mb-6">
+        <p className="text-black-600 mb-6">
           Semantic Legal Search + Law Student Explanations
         </p>
 
@@ -81,20 +81,20 @@ export default function Home() {
             </h2>
 
             {results.length === 0 && (
-              <p className="text-gray-500">No results yet.</p>
+              <p className="text-black-500">No results yet.</p>
             )}
 
             <div className="space-y-3">
               {results.map((item: SectionResult) => (
                 <div
                   key={item.section}
-                  className="p-4 bg-gray-50 rounded-xl shadow hover:bg-gray-100 cursor-pointer"
+                  className="p-4 bg-black-50 rounded-xl shadow hover:bg-black-100 cursor-pointer"
                   onClick={() => handleExplain(item.section)}
                 >
                   <h3 className="font-bold">
                     Section {item.section}: {item.title}
                   </h3>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-black-600 mt-1">
                     {item.preview}
                   </p>
                 </div>
