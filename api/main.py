@@ -47,7 +47,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://lexarena-eight.vercel.app/"
+        "https://lexarena-eight.vercel.app/",
+        "https://web-production-757f2.up.railway.app/"
     ],
     allow_methods=["*"],
     allow_headers=["*"],
