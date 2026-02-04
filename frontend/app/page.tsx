@@ -11,90 +11,173 @@ type SectionResult = {
 export default function Home() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SectionResult[]>([]);
-  const [selectedExplanation, setSelectedExplanation] =
-    useState<string | null>(null);
-
+  const [selectedExplanation, setSelectedExplanation] = useState<string | null>(
+    null
+  );
+  const [activeSection, setActiveSection] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [explaining, setExplaining] = useState(false);
 
+  // Environment variable for API URL (fallback to localhost)
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // 🔍 Semantic Search
-  async function handleSearch() {
-  if (!query) return;
+  async function handleSearch(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!query.trim()) return;
 
-  setLoading(true);
-  setSelectedExplanation(null);
+    setLoading(true);
+    setSelectedExplanation(null);
+    setActiveSection(null);
+    setResults([]);
 
-  const res = await fetch(
-    `https://web-production-757f2.up.railway.app/semantic-search?q=${encodeURIComponent(query)}`
-  );
+    try {
+      const res = await fetch(
+        `${API_URL}/semantic-search?q=${encodeURIComponent(query)}`
+      );
 
-  const data: SectionResult[] = await res.json();
-  setResults(data);
+      if (!res.ok) throw new Error("Failed to fetch results");
 
-  setLoading(false);
-}
+      const data: SectionResult[] = await res.json();
+      setResults(data);
+    } catch (err) {
+      // FIX: Use 'err' instead of 'error' to avoid potential naming conflicts
+      console.error(err);
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // 📘 Explanation Fetch
- async function handleExplain(sectionId: string) {
-  setSelectedExplanation("Loading explanation...");
+  async function handleExplain(sectionId: string) {
+    setActiveSection(sectionId);
+    setExplaining(true);
+    setSelectedExplanation(null); // Clear previous while loading
 
-  const res = await fetch(
-    `https://web-production-757f2.up.railway.app/explain/${sectionId}`
-  );
+    try {
+      const res = await fetch(`${API_URL}/explain/${sectionId}`);
+      if (!res.ok) throw new Error("Failed to fetch explanation");
 
-  const data: { explanation: string } = await res.json();
-  setSelectedExplanation(data.explanation);
-}
+      const data: { explanation: string } = await res.json();
+      setSelectedExplanation(data.explanation);
+    } catch (err) {
+      // FIX: Handle error gracefully
+      console.error(err);
+      setSelectedExplanation("Failed to load explanation. Please try again.");
+    } finally {
+      setExplaining(false);
+    }
+  }
 
   return (
-    <main className="min-h-screen bg-black-100 p-10">
-      <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-8">
-        {/* Header */}
-        <h1 className="text-4xl font-bold mb-2">LexArena ⚖️</h1>
-        <p className="text-black-600 mb-6">
-          Semantic Legal Search + Law Student Explanations
-        </p>
+    <div className="min-h-screen flex flex-col font-sans text-slate-900 bg-slate-50 selection:bg-indigo-100 selection:text-indigo-900">
+      
+      {/* 🟢 Navbar */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">⚖️</span>
+            <span className="text-xl font-bold tracking-tight text-slate-900">
+              LexArena
+            </span>
+            <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium border border-indigo-100 ml-2">
+              BETA
+            </span>
+          </div>
+        </div>
+      </nav>
 
-        {/* Search Box */}
-        <div className="flex gap-2">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        
+        {/* 🟢 Hero Section */}
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 tracking-tight mb-4">
+            Legal Research, <span className="text-indigo-600">Simplified.</span>
+          </h1>
+          <p className="text-lg text-slate-600">
+            Navigate the Bhartiya Nyaya Sanhita (BNS) with AI-powered semantic search and law-student style simplifications.
+          </p>
+        </div>
+
+        {/* 🟢 Search Bar */}
+        <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-16 relative group">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
           <input
-            className="flex-1 border p-3 rounded-xl"
-            placeholder="Search: theft punishment, snatching, religious assembly..."
+            className="block w-full pl-11 pr-32 py-4 bg-white border border-slate-200 rounded-2xl text-lg shadow-sm placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
+            placeholder="Ex: punishment for snatching purse..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-
           <button
-            onClick={handleSearch}
-            className="bg-black text-white px-6 rounded-xl"
+            type="submit"
+            disabled={loading}
+            className="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 rounded-xl transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {loading ? "Searching..." : "Search"}
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Searching
+              </span>
+            ) : (
+              "Search"
+            )}
           </button>
-        </div>
+        </form>
 
-        {/* Results */}
-        <div className="mt-8 grid grid-cols-2 gap-6">
-          {/* Left: Semantic Results */}
-          <div>
-            <h2 className="text-xl font-semibold mb-3">
-              Top Matching Sections
-            </h2>
+        {/* 🟢 Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Left Column: Results List */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+                Relevant Sections
+              </h2>
+              {results.length > 0 && (
+                <span className="text-xs text-slate-400">{results.length} results found</span>
+              )}
+            </div>
 
-            {results.length === 0 && (
-              <p className="text-black-500">No results yet.</p>
+            {results.length === 0 && !loading && (
+              <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl">
+                <p className="text-slate-400">Try searching for a legal topic.</p>
+              </div>
             )}
 
             <div className="space-y-3">
-              {results.map((item: SectionResult) => (
+              {results.map((item) => (
                 <div
                   key={item.section}
-                  className="p-4 bg-black-50 rounded-xl shadow hover:bg-black-100 cursor-pointer"
                   onClick={() => handleExplain(item.section)}
+                  className={`group relative p-5 rounded-xl border transition-all cursor-pointer hover:shadow-md ${
+                    activeSection === item.section
+                      ? "bg-indigo-50 border-indigo-200 shadow-sm ring-1 ring-indigo-500/20"
+                      : "bg-white border-slate-200 hover:border-indigo-300"
+                  }`}
                 >
-                  <h3 className="font-bold">
-                    Section {item.section}: {item.title}
+                  <div className="flex justify-between items-start mb-2">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border ${
+                      activeSection === item.section 
+                      ? "bg-indigo-100 text-indigo-800 border-indigo-200" 
+                      : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}>
+                      Section {item.section}
+                    </span>
+                  </div>
+                  <h3 className={`font-semibold text-lg mb-1 group-hover:text-indigo-600 transition-colors ${
+                    activeSection === item.section ? "text-indigo-900" : "text-slate-900"
+                  }`}>
+                    {item.title}
                   </h3>
-                  <p className="text-sm text-black-600 mt-1">
+                  <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
                     {item.preview}
                   </p>
                 </div>
@@ -102,20 +185,53 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right: Explanation Panel */}
-          <div>
-            <h2 className="text-xl font-semibold mb-3">
-              Explanation (Law Student Style)
-            </h2>
+          {/* Right Column: Explanation Panel */}
+          <div className="lg:col-span-7">
+            <div className="sticky top-24">
+              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">
+                Smart Explanation
+              </h2>
+              
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm min-h-[500px] flex flex-col overflow-hidden">
+                {/* Panel Header */}
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                    <span className="text-sm font-medium text-slate-600">
+                      AI Legal Assistant
+                    </span>
+                  </div>
+                </div>
 
-            <div className="p-4 bg-black text-white rounded-xl min-h-[300px] whitespace-pre-line">
-              {selectedExplanation
-                ? selectedExplanation
-                : "Click on a section to view explanation."}
+                {/* Panel Content */}
+                <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
+                  {explaining ? (
+                    <div className="space-y-4 animate-pulse">
+                      <div className="h-4 bg-slate-100 rounded w-3/4"></div>
+                      <div className="h-4 bg-slate-100 rounded w-1/2"></div>
+                      <div className="h-4 bg-slate-100 rounded w-5/6"></div>
+                      <div className="h-32 bg-slate-50 rounded-lg border border-dashed border-slate-100 w-full mt-6"></div>
+                    </div>
+                  ) : selectedExplanation ? (
+                    <div className="prose prose-slate max-w-none">
+                      <div className="whitespace-pre-line text-slate-700 leading-7 text-lg">
+                        {selectedExplanation}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-4">
+                      <svg className="w-16 h-16 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      <p>Select a section to view the simplified explanation</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
