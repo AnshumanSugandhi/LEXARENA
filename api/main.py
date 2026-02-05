@@ -14,9 +14,12 @@ app = FastAPI(title="LexArena API")
 sections = load_sections("data/processed/bns_sections.json")
 semantic_engine = SemanticEngine("data/processed/bns_sections.json")
 app.include_router(chat_router)
+
+
 @app.get("/")
 def root():
     return {"status": "LexArena running"}
+
 
 @app.get("/search")
 def search(q: str):
@@ -24,6 +27,7 @@ def search(q: str):
     if not result:
         return {"error": "Section not found"}
     return result
+
 
 @app.get("/explain/{section_id}")
 def explain(section_id: str):
@@ -41,10 +45,12 @@ def semantic(q: str):
         {
             "section": r["section"],
             "title": r["title"],
-            "preview": r["text"][:200] + "..."
+            "preview": r["text"][:200] + "...",
         }
         for r in results
     ]
+
+
 @app.post("/chat")
 def chat(payload: dict):
     query = payload.get("query")
@@ -53,9 +59,12 @@ def chat(payload: dict):
         return {"answer": "Please enter a valid query."}
 
     return chat_answer(query)
+
+
 @app.get("/dual-search")
 def dual(q: str):
     return dual_search(q)
+
 
 # In api/main.py
 
@@ -73,14 +82,8 @@ def dual(q: str):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://lexarena-eight.vercel.app"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-
