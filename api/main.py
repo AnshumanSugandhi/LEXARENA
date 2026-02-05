@@ -4,14 +4,14 @@ from core.search import search_section
 from core.explain import explain_section
 from core.semantic_engine import SemanticEngine
 from fastapi.middleware.cors import CORSMiddleware
-
+from api.routes.chat import router as chat_router
 
 
 app = FastAPI(title="LexArena API")
 
 sections = load_sections("data/processed/bns_sections.json")
 semantic_engine = SemanticEngine("data/processed/bns_sections.json")
-
+app.include_router(chat_router)
 @app.get("/")
 def root():
     return {"status": "LexArena running"}
