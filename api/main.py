@@ -5,6 +5,7 @@ from core.explain import explain_section
 from core.semantic_engine import SemanticEngine
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes.chat import router as chat_router
+from core.chat import chat_answer
 
 
 app = FastAPI(title="LexArena API")
@@ -43,6 +44,14 @@ def semantic(q: str):
         }
         for r in results
     ]
+@app.post("/chat")
+def chat(payload: dict):
+    query = payload.get("query")
+
+    if not query:
+        return {"answer": "Please ask a valid question."}
+
+    return chat_answer(query)
 
 # In api/main.py
 
