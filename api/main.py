@@ -8,6 +8,8 @@ from core.search import search_section
 from core.explain import explain_section
 from core.chat import chat_answer 
 from core.semantic_search import semantic_search  # <--- Import this to reuse the engine
+from core.chat_agent import chat_answer
+
 
 app = FastAPI(title="LexArena API")
 
@@ -68,6 +70,15 @@ def explain_endpoint(section_id: str):
         # Fallback: Try to find it in the semantic search results if not in direct lookup
         return {"error": "Section not found"}
     return {"explanation": explain_section(section)}
+
+@app.post("/chat")
+def chat(payload: dict):
+    query = payload.get("query")
+
+    if not query:
+        return {"answer": "Please ask something valid."}
+
+    return chat_answer(query)
 
 @app.post("/chat")
 def chat_endpoint(payload: ChatRequest):
