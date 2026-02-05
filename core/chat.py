@@ -2,41 +2,31 @@ from core.semantic_search import semantic_search
 from core.explain import explain_section
 
 
+chat_history = []
+
+
 def chat_answer(query: str):
-    """
-    Full assistant pipeline:
-    User Query → Semantic Search → Best Section → Explanation → ChatGPT style reply
-    """
+    global chat_history
 
-    results = semantic_search(query)
+    chat_history.append({"role": "user", "text": query})
 
-    if not results:
-        return {
-            "answer": "Sorry, I could not find any relevant legal section for your query."
-        }
+    results = semantic_search(query, k=3)
 
-    # Take top result
-    best = results[0]
+    response = []
+    response.append(f"## Answer: {query}\n")
 
-    section_id = best["section"]
-    title = best["title"]
+    for r in results:
+        explanation = explain_section(r)
+        response.append(
+            f"### Section {r['section']} — {r['title']}\n{explanation}\n"
+        )
 
-    # Generate explanation
-    explanation = explain_section({
-        "section": section_id,
-        "title": title,
-        "text": best["text"]
-    })
+    final = "\n".join(response)
 
-    # Final assistant response
-    final_answer = f"""
-📌 **Section {section_id} — {title}**
+    chat_history.append({"role": "assistant", "text": final})
 
-{explanation}
+    return {
+        "answer": final,
+        "memory": chat_history[-6:]  # last 3 exchanges
+    }
 
----
-
-✅ *This answer is based on Bhartiya Nyaya Sanhita (BNS) official text.*
-"""
-
-    return {"answer": final_answer.strip()}

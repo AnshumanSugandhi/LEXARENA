@@ -6,6 +6,7 @@ from core.semantic_engine import SemanticEngine
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes.chat import router as chat_router
 from core.chat import chat_answer
+from core.dual_search import dual_search
 
 
 app = FastAPI(title="LexArena API")
@@ -49,9 +50,12 @@ def chat(payload: dict):
     query = payload.get("query")
 
     if not query:
-        return {"answer": "Please ask a valid question."}
+        return {"answer": "Please enter a valid query."}
 
     return chat_answer(query)
+@app.get("/dual-search")
+def dual(q: str):
+    return dual_search(q)
 
 # In api/main.py
 
@@ -69,10 +73,14 @@ def chat(payload: dict):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # later restrict to vercel domain
+    allow_origins=[
+        "http://localhost:3000",
+        "https://lexarena-eight.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 

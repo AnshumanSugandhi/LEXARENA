@@ -1,26 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
+// Types
 type SectionResult = {
   section: string;
   title: string;
   preview: string;
 };
 
+type Message = {
+  role: "user" | "assistant";
+  text: string;
+};
+
 export default function Home() {
+  // 🔄 Mode State (Search vs Chat)
+  const [mode, setMode] = useState<"search" | "chat">("search");
+
+  // 🔍 Search State
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SectionResult[]>([]);
-  const [selectedExplanation, setSelectedExplanation] = useState<string | null>(
-    null,
-  );
+  const [selectedExplanation, setSelectedExplanation] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [explaining, setExplaining] = useState(false);
 
+  // 💬 Chat State (Memory)
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  // 🔍 Semantic Search
+  // Auto-scroll to bottom of chat
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, chatLoading]);
+
+  // --- HANDLERS ---
+
+  // 1. Search Handler
   async function handleSearch(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (!query.trim()) return;
@@ -31,23 +52,19 @@ export default function Home() {
     setResults([]);
 
     try {
-      const res = await fetch(
-        `${API_URL}/semantic-search?q=${encodeURIComponent(query)}`,
-      );
-
+      const res = await fetch(`${API_URL}/semantic-search?q=${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error("Failed to fetch results");
-
-      const data: SectionResult[] = await res.json();
+      const data = await res.json();
       setResults(data);
     } catch (err) {
       console.error(err);
-      alert("Something went wrong. Please try again.");
+      alert("Search failed.");
     } finally {
       setLoading(false);
     }
   }
 
-  // 📘 Explanation Fetch
+  // 2. Explain Handler
   async function handleExplain(sectionId: string) {
     setActiveSection(sectionId);
     setExplaining(true);
@@ -56,238 +73,219 @@ export default function Home() {
     try {
       const res = await fetch(`${API_URL}/explain/${sectionId}`);
       if (!res.ok) throw new Error("Failed to fetch explanation");
-
-      const data: { explanation: string } = await res.json();
+      const data = await res.json();
       setSelectedExplanation(data.explanation);
     } catch (err) {
       console.error(err);
-      setSelectedExplanation("Failed to load explanation. Please try again.");
+      setSelectedExplanation("Failed to load explanation.");
     } finally {
       setExplaining(false);
     }
   }
-  async function handleChat() {
-    if (!query.trim()) return;
 
-    setSelectedExplanation("Thinking...");
+  // 3. Chat Handler (The Memory Logic)
+  async function handleSendMessage(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    // A. Add User Message to Memory
+    const newMsg: Message = { role: "user", text: chatInput };
+    setMessages((prev) => [...prev, newMsg]);
+    setChatInput("");
+    setChatLoading(true);
 
     try {
+      // B. Send to Backend
       const res = await fetch(`${API_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query: newMsg.text }),
       });
 
+      if (!res.ok) throw new Error("Chat failed");
+
       const data = await res.json();
-      setSelectedExplanation(data.answer);
+
+      // C. Add AI Response to Memory
+      const aiMsg: Message = { role: "assistant", text: data.answer };
+      setMessages((prev) => [...prev, aiMsg]);
     } catch (err) {
       console.error(err);
-      setSelectedExplanation("⚠️ Assistant failed. Try again.");
+      setMessages((prev) => [...prev, { role: "assistant", text: "⚠️ Sorry, I encountered an error." }]);
+    } finally {
+      setChatLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-sans text-black bg-white selection:bg-indigo-100 selection:text-black">
-      {/* 🟢 Navbar */}
-      <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-black/10">
+    <div className="min-h-screen flex flex-col font-sans text-black bg-white">
+      
+      {/* 🟢 Navbar & Mode Switcher */}
+      <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b-2 border-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-2xl">⚖️</span>
-            <span className="text-xl font-extrabold tracking-tight text-black">
-              LexArena
-            </span>
-            <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100 ml-2">
-              BETA
-            </span>
+            <span className="text-xl font-extrabold tracking-tight">LexArena</span>
+            <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-white text-black text-xs font-bold border-2 border-black ml-2">BETA</span>
+          </div>
+
+          {/* Toggle Switch */}
+          <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-300">
+            <button
+              onClick={() => setMode("search")}
+              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                mode === "search" ? "bg-white shadow-sm text-black border border-black" : "text-gray-500 hover:text-black"
+              }`}
+            >
+              Search
+            </button>
+            <button
+              onClick={() => setMode("chat")}
+              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                mode === "chat" ? "bg-black text-white shadow-sm" : "text-gray-500 hover:text-black"
+              }`}
+            >
+              AI Chat
+            </button>
           </div>
         </div>
       </nav>
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* 🟢 Hero Section */}
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <h1 className="text-4xl sm:text-5xl font-black text-black tracking-tight mb-4">
-            Legal Research, <span className="text-indigo-600">Simplified.</span>
-          </h1>
-          {/* CHANGED: text-slate-600 -> text-black */}
-          <p className="text-lg text-black font-medium">
-            Navigate the Bhartiya Nyaya Sanhita (BNS) with AI-powered semantic
-            search and law-student style simplifications.
-          </p>
-        </div>
-
-        {/* 🟢 Search Bar */}
-        <form
-          onSubmit={handleSearch}
-          className="max-w-2xl mx-auto mb-16 relative group"
-        >
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            {/* CHANGED: text-slate-400 -> text-black */}
-            <svg
-              className="h-5 w-5 text-black"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
-          <input
-            className="block w-full pl-11 pr-32 py-4 bg-white border-2 border-gray-200 rounded-2xl text-lg text-black font-medium shadow-sm placeholder:text-gray-500 focus:outline-none focus:border-indigo-600 focus:ring-0 transition-all"
-            placeholder="Ex: punishment for snatching purse..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <div className="flex gap-2 absolute right-2 top-2 bottom-2">
-  
-  <button
-    type="submit"
-    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 rounded-xl"
-  >
-    Search
-  </button>
-
-  <button
-    type="button"
-    onClick={handleChat}
-    className="bg-black hover:bg-gray-900 text-white font-bold px-5 rounded-xl"
-  >
-    Ask AI
-  </button>
-
-</div>
-
-        </form>
-
-        {/* 🟢 Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Results List */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              {/* CHANGED: text-slate-500 -> text-black */}
-              <h2 className="text-sm font-bold text-black uppercase tracking-wider">
-                Relevant Sections
-              </h2>
-              {results.length > 0 && (
-                // CHANGED: text-slate-400 -> text-black
-                <span className="text-xs font-bold text-black border border-black px-2 py-0.5 rounded-full">
-                  {results.length} results
-                </span>
-              )}
+        
+        {/* ================= SEARCH MODE ================= */}
+        {mode === "search" && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="text-center max-w-2xl mx-auto mb-12">
+              <h1 className="text-4xl sm:text-5xl font-black mb-4">
+                Legal Research, <span className="underline decoration-4 underline-offset-4">Simplified.</span>
+              </h1>
+              <p className="text-lg font-bold">Semantic search for the BNS.</p>
             </div>
 
-            {results.length === 0 && !loading && (
-              <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-2xl">
-                {/* CHANGED: text-slate-400 -> text-black */}
-                <p className="text-black font-medium">
-                  Try searching for a legal topic.
-                </p>
-              </div>
-            )}
+            {/* Search Bar */}
+            <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-16 relative">
+              <input
+                className="block w-full pl-6 pr-32 py-4 bg-white border-2 border-black rounded-2xl text-lg font-bold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:translate-x-[2px] focus:translate-y-[2px] focus:shadow-none transition-all"
+                placeholder="Ex: punishment for snatching purse..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="absolute right-2 top-2 bottom-2 bg-black text-white font-bold px-6 rounded-xl hover:bg-gray-800 transition-colors"
+              >
+                {loading ? "..." : "Search"}
+              </button>
+            </form>
 
-            <div className="space-y-3">
-              {results.map((item) => (
-                <div
-                  key={item.section}
-                  onClick={() => handleExplain(item.section)}
-                  className={`group relative p-5 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
-                    activeSection === item.section
-                      ? "bg-indigo-50 border-indigo-600"
-                      : "bg-white border-gray-200 hover:border-indigo-400"
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold border ${
-                        activeSection === item.section
-                          ? "bg-indigo-100 text-indigo-900 border-indigo-200"
-                          : "bg-gray-100 text-black border-gray-300"
-                      }`}
-                    >
-                      Section {item.section}
-                    </span>
+            {/* Results Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Left: List */}
+              <div className="lg:col-span-5 space-y-4">
+                {results.map((item) => (
+                  <div
+                    key={item.section}
+                    onClick={() => handleExplain(item.section)}
+                    className={`group p-5 rounded-xl border-2 cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all ${
+                      activeSection === item.section ? "bg-black text-white border-black" : "bg-white border-black"
+                    }`}
+                  >
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded border-2 ${
+                       activeSection === item.section ? "bg-white text-black border-white" : "bg-gray-100 border-black"
+                    }`}>Section {item.section}</span>
+                    <h3 className="font-bold text-lg mt-2">{item.title}</h3>
+                    <p className={`text-sm mt-1 line-clamp-2 ${activeSection === item.section ? "text-gray-300" : "text-gray-600"}`}>{item.preview}</p>
                   </div>
-                  {/* CHANGED: text-slate-900 -> text-black */}
-                  <h3 className="font-bold text-lg mb-1 text-black">
-                    {item.title}
-                  </h3>
-                  {/* CHANGED: text-slate-500 -> text-black */}
-                  <p className="text-sm text-black line-clamp-2 leading-relaxed font-medium">
-                    {item.preview}
-                  </p>
+                ))}
+              </div>
+
+              {/* Right: Explain */}
+              <div className="lg:col-span-7 sticky top-24">
+                <div className="bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] min-h-[500px] flex flex-col p-6">
+                   <h2 className="text-sm font-bold uppercase border-b-2 border-black pb-2 mb-4">Explanation Panel</h2>
+                   {explaining ? (
+                     <div className="animate-pulse space-y-4"><div className="h-4 bg-gray-200 w-3/4 rounded"/><div className="h-4 bg-gray-200 w-1/2 rounded"/></div>
+                   ) : selectedExplanation ? (
+                     // NO MARKDOWN HERE - Just simple text rendering
+                     <div className="whitespace-pre-wrap font-medium text-black leading-7">
+                        {selectedExplanation}
+                     </div>
+                   ) : (
+                     <div className="flex-1 flex items-center justify-center text-gray-400 font-bold">Select a section to explain</div>
+                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= CHAT MODE ================= */}
+        {mode === "chat" && (
+          <div className="max-w-3xl mx-auto h-[80vh] flex flex-col bg-white border-2 border-black rounded-2xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            
+            {/* Header */}
+            <div className="p-4 border-b-2 border-black bg-gray-50 flex items-center justify-between">
+              <span className="font-black text-lg">AI Legal Assistant</span>
+              <span className="text-xs font-bold bg-black text-white px-2 py-1 rounded">RAG Enabled</span>
+            </div>
+
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-white">
+              {messages.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50">
+                  <span className="text-6xl mb-4">⚖️</span>
+                  <p className="font-bold">Ask anything about the BNS law.</p>
+                </div>
+              )}
+              
+              {messages.map((m, i) => (
+                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[85%] p-4 rounded-2xl border-2 text-sm font-medium whitespace-pre-wrap ${
+                    m.role === "user" 
+                      ? "bg-black text-white border-black rounded-br-none" 
+                      : "bg-gray-100 text-black border-black rounded-bl-none"
+                  }`}>
+                    {/* NO MARKDOWN HERE - Just simple text rendering */}
+                    {m.text}
+                  </div>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Right Column: Explanation Panel */}
-          <div className="lg:col-span-7">
-            <div className="sticky top-24">
-              {/* CHANGED: text-slate-500 -> text-black */}
-              <h2 className="text-sm font-bold text-black uppercase tracking-wider mb-4">
-                Smart Explanation
-              </h2>
-
-              <div className="bg-white rounded-2xl border-2 border-gray-200 shadow-sm min-h-[500px] flex flex-col overflow-hidden">
-                {/* Panel Header */}
-                <div className="px-6 py-4 border-b-2 border-gray-100 bg-gray-50 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-green-600"></div>
-                    {/* CHANGED: text-slate-600 -> text-black */}
-                    <span className="text-sm font-bold text-black">
-                      AI Legal Assistant
-                    </span>
+              
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 text-black border-2 border-black px-4 py-2 rounded-2xl rounded-bl-none animate-pulse font-bold text-sm">
+                    Thinking...
                   </div>
                 </div>
-
-                {/* Panel Content */}
-                <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
-                  {explaining ? (
-                    <div className="space-y-4 animate-pulse">
-                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                      <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-                      <div className="h-32 bg-gray-100 rounded-lg border border-dashed border-gray-200 w-full mt-6"></div>
-                    </div>
-                  ) : selectedExplanation ? (
-                    <div className="prose prose-slate max-w-none">
-                      {/* CHANGED: text-slate-700 -> text-black */}
-                      <div className="whitespace-pre-line text-black leading-7 text-lg font-medium">
-                        {selectedExplanation}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center gap-4">
-                      {/* CHANGED: text-slate-200 -> text-black (with low opacity if needed, or just black) */}
-                      <svg
-                        className="w-16 h-16 text-black opacity-20"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                        />
-                      </svg>
-                      {/* CHANGED: text-slate-400 -> text-black */}
-                      <p className="text-black font-bold">
-                        Select a section to view the simplified explanation
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
+              )}
+              <div ref={messagesEndRef} />
             </div>
+
+            {/* Input Area */}
+            <div className="p-4 bg-gray-50 border-t-2 border-black">
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <input
+                  className="flex-1 bg-white border-2 border-black rounded-xl px-4 py-3 font-medium focus:outline-none focus:ring-2 focus:ring-black/20 transition-all"
+                  placeholder="Ask a legal question..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  disabled={chatLoading}
+                />
+                <button 
+                  type="submit" 
+                  disabled={chatLoading || !chatInput.trim()}
+                  className="bg-black text-white font-bold px-6 rounded-xl hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Send
+                </button>
+              </form>
+            </div>
+
           </div>
-        </div>
+        )}
+
       </main>
     </div>
   );
