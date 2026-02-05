@@ -46,13 +46,21 @@ def semantic(q: str):
 
 # In api/main.py
 
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=[
+#         "http://localhost:3000",                 # Local development
+#         "https://lexarena-eight.vercel.app",     # <--- YOUR FRONTEND
+#         "https://lexarena-eight.vercel.app/"     # (Add this too, just to be safe)
+#     ],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",                 # Local development
-        "https://lexarena-eight.vercel.app",     # <--- YOUR FRONTEND
-        "https://lexarena-eight.vercel.app/"     # (Add this too, just to be safe)
-    ],
+    allow_origins=["*"],  # later restrict to vercel domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
